@@ -24,14 +24,14 @@ after_success:
 - git config --global user.email "${GIT_EMAIL}"
 - mkdir doc
 - cd doc
-- git clone https://github.com/yazgoo/fuse_kafka.git .
+- git clone https://github.com/llparse/fuse_kafka.git .
 - git checkout gh-pages
 - cd ..
 - ./build.py doc
 - cd doc
 - git add --all .
 - git commit -m "auto updating documenation"
-- git push https://${GH_TOKEN}@github.com/yazgoo/fuse_kafka.git gh-pages
+- git push https://${GH_TOKEN}@github.com/llparse/fuse_kafka.git gh-pages
 env:
   global:
     secure: LZlIH/SfgTMAQjUULjIk4j6pxhxVKPRvzRopdDeFnXrRozIeBdUUOePQEMoFYiiu/qAhoROEiO9SupvyX6YE2wGpEm/PIN30HmAXN1OxabpADPjyjbCHycaYb8ejl9xjoA3w68YbT7ezhV/ut1fvuihDZxotqUodXK7n1m7M+K4=
