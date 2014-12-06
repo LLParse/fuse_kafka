@@ -6,7 +6,7 @@ except ImportError, e:
 from fabricate import *
 sources = ['fuse_kafka']
 binary_name = sources[0]
-common_libs = ["crypto", "fuse", "dl", "pthread", "jansson"]#, "ulockmgr"]
+common_libs = ["crypto", "fuse", "dl", "pthread", "jansson", "protobuf-c"]#, "ulockmgr"]
 libs = ["zookeeper_mt", "rdkafka",  "z", "rt"] + common_libs
 flags = ['-D_FILE_OFFSET_BITS=64']
 test_flags = ['-fprofile-arcs', '-ftest-coverage', '-DTEST="out"']
@@ -121,6 +121,7 @@ def dotest():
     compile_test()
     test()
 def build():
+    generate()
     compile()
     link()
 def test():
@@ -131,6 +132,8 @@ def test():
             run("lcov", "-c", "-d", ".", "-o", "./src/" + source + ".info")
             if binary_exists("genhtml"):
                 run("genhtml", "src/" + source + ".info", "-o", "./out")
+def generate():
+    run('protoc-c', '--c_out=./src', 'log.proto')
 def compile():
     for source in sources:
         run('gcc', '-g', '-c', "./src/" + source+'.c', flags)
