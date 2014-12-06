@@ -20,5 +20,3 @@ fuse_kafka.test
 out/*
 a.out
 log-cleaner.log
-*.pb-*.c
-*.pb-*.h
