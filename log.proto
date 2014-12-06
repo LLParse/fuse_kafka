@@ -1,0 +1,36 @@
+//
+// A process log entry
+//
+message LogEntry
+{
+	//
+	// Comprises fields describing the origin of the log entry
+	//
+	message Origin
+	{
+		//
+		// Key/value pair that describes the origin of a log entry. These are static values 
+		// passed from the fuse_kafka daemon via the --fields argument. They are inherited by
+		// and transmitted with each log entry. USE SPARINGLY.
+		//
+		message Attribute
+		{
+			required string key = 1;
+			required string value = 2;
+		}
+
+		// Supplied by the fuse library 
+		required int32 pid = 1;
+		required int32 gid = 2;
+		required int32 uid = 3;
+		// inferred by inspecting the environment
+		optional string group = 4;
+		optional string user = 5;
+		// server attribution
+		repeated Attribute attributes = 6;
+	}
+
+	required Origin origin = 1;
+	required string line = 2;
+	required sfixed64 timestamp = 3;
+}
