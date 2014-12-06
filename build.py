@@ -121,7 +121,6 @@ def dotest():
     compile_test()
     test()
 def build():
-    generate()
     compile()
     link()
 def test():
@@ -135,9 +134,11 @@ def test():
 def generate():
     run('protoc-c', '--c_out=./src', 'log.proto')
 def compile():
+    generate()
     for source in sources:
         run('gcc', '-g', '-c', "./src/" + source+'.c', flags)
 def compile_test():
+    generate()
     for source in sources:
         run('gcc', '-g', '-o', source+'.test', "./src/" + source+'.c', flags,
                 test_flags, to_links(common_libs))
