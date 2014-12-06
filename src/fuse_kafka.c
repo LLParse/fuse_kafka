@@ -85,6 +85,7 @@ typedef struct _config {
     }
 #include "util.c"
 #include "kafka_client.c"
+#include "log.pb-c.c"
 /**
  * @brief actually does the write to kafka of a string with the given
  * file path
@@ -94,38 +95,47 @@ typedef struct _config {
  * @param offset starting point in the buffer
  * @return 0 if the write succeeded, 1 otherwise
  **/
-static int actual_kafka_write(const char *path, const char *buf,
+static int actual_kafka_write(const char *path, char *buf,
         size_t size, off_t offset)
 {
-    char* ret = NULL;
-    (void) path;
-    char timestamp[] = "YYYY-MM-ddTHH:mm:ss.SSS+0000";
-    char* text = base64(buf, size);
+    LogEntry entry = LOG_ENTRY__INIT;
+    LogEntry__Origin origin = LOG_ENTRY__ORIGIN__INIT;
+    void *serialized;
+    unsigned len;
+    
     struct fuse_context* context = fuse_get_context();
+    entry.origin = &origin;
+    origin.pid = context->pid;
+    origin.gid = context->gid;
+    origin.uid = context->uid;
     struct group* sgroup = getgrgid(context->gid);
     struct passwd* suser = getpwuid(context->uid);
-    char* user = suser == NULL ? "":suser->pw_name;
-    char* group = sgroup == NULL ? "":sgroup->gr_name;
-    char* command = get_command_line(context->pid);
-    char* format = "{\"path\": \"%s%s\", \"pid\": %d, \"uid\": %d, "
-        "\"gid\": %d, \"@message\": \"%s\", \"@timestamp\": \"%s\","
-        "\"user\": \"%s\", \"group\": \"%s\", \"command\": \"%s\","
-        "\"@version\": \"%s\", \"@fields\": %s, \"@tags\": %s}";
-    kafka_t *private_data = (kafka_t*) fuse_get_context()->private_data;
+    origin.group = sgroup == NULL ? NULL : sgroup->gr_name;
+    origin.user =  suser == NULL ? NULL : suser->pw_name;
+    entry.line = buf;
+    struct timeval tp;
+    gettimeofday(&tp, NULL);
+    entry.timestamp = tp.tv_sec * 1000 + tp.tv_usec / 1000;
+    
+    kafka_t *private_data = (kafka_t*) context->private_data;
     config* conf = (config*)private_data->conf;
-    set_timestamp(timestamp);
-    asprintf(&ret, format, conf->directories[conf->directory_n],
-            path + 1, context->pid, context->uid, context->gid,
-            text, timestamp, user, group, command, VERSION,
-            conf->fields_s, conf->tags_s);
-    free(command);
-    free(text);
-    if (ret == NULL) {
-        fprintf(stderr, "Error in asprintf\n");
-        return 1;
+    int i = 0;
+    for (; i < conf->fields_n; i++) {
+        //LogEntry__Origin__Attribute attribute = LOG_ENTRY__ORIGIN__ATTRIBUTE__INIT;
+        //attribute.key = "key";
+        //attribute.value = "value";
+        //attribute.key = conf->fields[i];
+        //attribute.value = conf->fields[i];
+        //origin.attributes[origin.n_attributes++] = &attribute;
     }
-    send_kafka(context->private_data, ret, strlen(ret));
-    free(ret);
+    //entry.origin.n_attributes
+    //entry.origin.attributes
+
+    len = log_entry__get_packed_size(&entry);    
+    serialized = malloc(len);
+    log_entry__pack(&entry, serialized);
+    send_kafka(context->private_data, serialized, len);
+    free(serialized);
     return 0;
 }
 #include "trace.c"
@@ -164,7 +174,7 @@ static int should_write_to_kafka(const char* path, size_t size)
  * @param fi file information @see fuse
  * @return @see pwrite
  */
-static int kafka_write(const char *path, const char *buf,
+static int kafka_write(const char *path, char *buf,
         size_t size, off_t offset, struct fuse_file_info *fi)
 {
     int res;
