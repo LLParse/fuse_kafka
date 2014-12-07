@@ -95,15 +95,17 @@ typedef struct _config {
  * @param offset starting point in the buffer
  * @return 0 if the write succeeded, 1 otherwise
  **/
-static int actual_kafka_write(const char *path, char *buf,
+static int actual_kafka_write(const char *path, const char *buf,
         size_t size, off_t offset)
 {
-    LogEntry entry = LOG_ENTRY__INIT;
-    LogEntry__Origin origin = LOG_ENTRY__ORIGIN__INIT;
-    void *serialized;
-    unsigned len;
-    
     struct fuse_context* context = fuse_get_context();
+    struct timeval tp;
+    gettimeofday(&tp, NULL);
+    LogEntry entry = LOG_ENTRY__INIT;
+    entry.timestamp = tp.tv_sec * 1000 + tp.tv_usec / 1000;
+    entry.line = buf;
+
+    LogEntry__Origin origin = LOG_ENTRY__ORIGIN__INIT;
     entry.origin = &origin;
     origin.pid = context->pid;
     origin.gid = context->gid;
@@ -112,27 +114,21 @@ static int actual_kafka_write(const char *path, char *buf,
     struct passwd* suser = getpwuid(context->uid);
     origin.group = sgroup == NULL ? NULL : sgroup->gr_name;
     origin.user =  suser == NULL ? NULL : suser->pw_name;
-    entry.line = buf;
-    struct timeval tp;
-    gettimeofday(&tp, NULL);
-    entry.timestamp = tp.tv_sec * 1000 + tp.tv_usec / 1000;
-    
-    kafka_t *private_data = (kafka_t*) context->private_data;
-    config* conf = (config*)private_data->conf;
-    int i = 0;
-    for (; i < conf->fields_n; i++) {
-        //LogEntry__Origin__Attribute attribute = LOG_ENTRY__ORIGIN__ATTRIBUTE__INIT;
-        //attribute.key = "key";
-        //attribute.value = "value";
-        //attribute.key = conf->fields[i];
-        //attribute.value = conf->fields[i];
-        //origin.attributes[origin.n_attributes++] = &attribute;
-    }
-    //entry.origin.n_attributes
-    //entry.origin.attributes
 
-    len = log_entry__get_packed_size(&entry);    
-    serialized = malloc(len);
+    kafka_t* private_data = (kafka_t*) context->private_data;
+    config* conf = (config*) private_data->conf;
+    origin.n_attributes = conf->fields_n / 2;
+    origin.attributes = malloc(origin.n_attributes * sizeof(LogEntry__Origin__Attribute *));
+    int i;
+    for (i = 0; i < origin.n_attributes; i++) {
+        LogEntry__Origin__Attribute attribute = LOG_ENTRY__ORIGIN__ATTRIBUTE__INIT;
+        origin.attributes[i] = &attribute;
+        origin.attributes[i]->key = conf->fields[2 * i];
+        origin.attributes[i]->value = conf->fields[2 * i + 1];
+    }
+
+    unsigned len = log_entry__get_packed_size(&entry);
+    void *serialized = malloc(len);
     log_entry__pack(&entry, serialized);
     send_kafka(context->private_data, serialized, len);
     free(serialized);
@@ -174,7 +170,7 @@ static int should_write_to_kafka(const char* path, size_t size)
  * @param fi file information @see fuse
  * @return @see pwrite
  */
-static int kafka_write(const char *path, char *buf,
+static int kafka_write(const char *path, const char *buf,
         size_t size, off_t offset, struct fuse_file_info *fi)
 {
     int res;
