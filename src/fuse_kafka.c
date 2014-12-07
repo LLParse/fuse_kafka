@@ -103,7 +103,9 @@ static int actual_kafka_write(const char *path, const char *buf,
     gettimeofday(&tp, NULL);
     LogEntry entry = LOG_ENTRY__INIT;
     entry.timestamp = tp.tv_sec * 1000 + tp.tv_usec / 1000;
-    entry.line = buf;
+    char line[size];
+    strncpy(line, buf, size);
+    entry.line = line;
 
     LogEntry__Origin origin = LOG_ENTRY__ORIGIN__INIT;
     entry.origin = &origin;
